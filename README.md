@@ -1,26 +1,30 @@
 # YEGSECBOT
 
-## Database Schema
+Just a little slack bot to keep track of things for our local YEGSEC security meet up.
 
-### Tables & Columns
+## Usage
 
-* Users
-    * slack_id (pk)
-* Years
-    * year_id (pk)
-* Months
-    * month_id (pk)
-* Day
-    * day_id (pk)
-* Talks
-    * talk_id (pk)
-    * title
-    * summary
-    * year_id (fk)
-    * month_id (fk)
-* Meetup
-    * meetup_id (pk)
-    * year_id (fk)
-    * month_id (fk)
-    * day_id (fk)
-    * att_total
+1. Add bot token to `config.json`
+2. `docker build . -t yegsecbot`
+3. `docker run yegsecbot python yegsecbot.py`
+
+## Credits
+
+* [super useful resource](https://www.fullstackpython.com/blog/build-first-slack-bot-python.html)
+* @jershmagersh
+
+## License
+
+Copyright [2019] [@jershmagersh]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

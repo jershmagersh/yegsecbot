@@ -36,8 +36,13 @@ class YegsecDatabase:
                 veg_bool = 1
             else:
                 veg_bool = 0
-            self.cursor.execute("INSERT INTO confirmations (user_id, meetup_id, pizza_pref) VALUES ('{}', {}, {})".format(user, meeting_id, veg_bool))
-            self.yegsec_commit()
+            self.cursor.execute("SELECT * FROM confirmations WHERE meetup_id = {} AND user_id = '{}'".format(meeting_id, user))
+            if(self.cursor.fetchone()):
+                return False
+            else:
+                self.cursor.execute("INSERT INTO confirmations (user_id, meetup_id, pizza_pref) VALUES ('{}', {}, {})".format(user, meeting_id, veg_bool))
+                self.yegsec_commit()
+                return True
         else:
             return False
 
@@ -60,6 +65,34 @@ class YegsecDatabase:
     def yegsec_commit(self):
         self.conn.commit()
         #self.conn.close()
+
+    def get_summary(self):
+        result = self.cursor.execute("SELECT meetup_id FROM meetups")
+        results = {}
+        meetup_ids = []
+
+        meetup_id = self.cursor.fetchone()
+        while(meetup_id):
+            meetup_ids.append(meetup_id)
+            meetup_id = self.cursor.fetchone()
+
+        for meetup_id_a in meetup_ids:
+            meetup_id = meetup_id_a[0]
+            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = {} AND pizza_pref = 1".format(meetup_id))
+            veg_count = self.cursor.fetchone()
+            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = {} AND pizza_pref = 0".format(meetup_id))
+            other_count = self.cursor.fetchone()
+            self.cursor.execute("SELECT day_id, month_id, year_id FROM meetups WHERE meetup_id = {}".format(meetup_id))
+            date_result = self.cursor.fetchone()
+
+            results[meetup_id] = { "veg": veg_count[0],
+                                   "other": other_count[0],
+                                   "day": date_result[0],
+                                   "month": date_result[1],
+                                   "year": date_result[2]
+            }
+
+        return results
 
 class YegsecBot:
     def __init__(self, config):
@@ -120,36 +153,6 @@ class YegsecBot:
         rs = re.findall("add me for ([0-9]{1,2}), ?([0-9]{4}) (vegetarian|any)", command, re.IGNORECASE)
         rsm = re.findall("add me next (vegetarian|any)", command, re.IGNORECASE)
         if(len(rs) == 1 or len(rsm) == 1):
-            try:
-                if len(rs) == 1:
-                    month = int(rs[0][0])
-                    year = int(rs[0][1])
-                elif len(rsm) == 1:
-                    month, year = self.get_next_meet()
-                    rs = rsm
-                month_str = datetime.datetime(year, month, 1).strftime("%B")
-                vegetarian = None
-                if("VEG" in rs[0][2].upper()):
-                    vegetarian = False
-                    resp_veg = "vegetarian"
-                    vegetarian = True
-                else:
-                    vegetarian = True
-                    resp_veg = "non-vegetarian"
-                    vegetarian = False
-                self.db.confirm_user(user, month, year, vegetarian)
-                return(":pizza::pizza::pizza:Thank you <@{}>, I will add you to the pizza numbers for the month {} for the year {} as a {} option:pizza::pizza::pizza:".format(user, month_str, year, resp_veg))
-            except:
-                return("Sorry, I tried to add you with that command, but I couldn't quite understand it. Please try again.")
-
-    def remove_user(self, command, channel, user):
-        """
-            Main function of the bot. We use this command for adding user numbers and their preferred vegetarian options
-            to the database.
-        """
-        rs = re.findall("remove me for ([0-9]{1,2}), ?([0-9]{4})", command, re.IGNORECASE)
-        rsm = re.findall("remove me next", command, re.IGNORECASE)
-        if(len(rs) == 1 or len(rsm) == 1):
             #try:
             if len(rs) == 1:
                 month = int(rs[0][0])
@@ -158,13 +161,51 @@ class YegsecBot:
                 month, year = self.get_next_meet()
                 rs = rsm
             month_str = datetime.datetime(year, month, 1).strftime("%B")
-            self.db.remove_confirm_user(user, month, year)
-            return(":pizza::pizza::pizza:Thank you <@{}>, I will remove you to the pizza numbers for the month {} for the year {}:pizza::pizza::pizza:".format(user, month_str, year))
+            vegetarian = None
+            if("VEG" in rs[0][2].upper()):
+                vegetarian = False
+                resp_veg = "vegetarian"
+                vegetarian = True
+            else:
+                vegetarian = True
+                resp_veg = "non-vegetarian"
+                vegetarian = False
+            result = self.db.confirm_user(user, month, year, vegetarian)
+            if result:
+                return(":pizza::pizza::pizza:Thank you <@{}>, I will add you to the pizza numbers for the month {} for the year {} as a {} option:pizza::pizza::pizza:".format(user, month_str, year, resp_veg))
+            else:
+                return(":pizza::pizza::pizza:Sorry, <@{}> it looks like you've already been added for that month.:pizza::pizza::pizza:".format(user))
             #except:
-            return("Sorry, I tried to remove you with that command, but I couldn't quite understand it. Please try again.")
+            #    return("Sorry, I tried to add you with that command, but I couldn't quite understand it. Please try again.")
+
+    def remove_user(self, command, channel, user):
+        """
+            Another main function of the bot. We use this command for removing user numbers and their preferred vegetarian options
+            from the database.
+        """
+        rs = re.findall("remove me for ([0-9]{1,2}), ?([0-9]{4})", command, re.IGNORECASE)
+        rsm = re.findall("remove me next", command, re.IGNORECASE)
+        if(len(rs) == 1 or len(rsm) == 1):
+            try:
+                if len(rs) == 1:
+                    month = int(rs[0][0])
+                    year = int(rs[0][1])
+                elif len(rsm) == 1:
+                    month, year = self.get_next_meet()
+                    rs = rsm
+                month_str = datetime.datetime(year, month, 1).strftime("%B")
+                self.db.remove_confirm_user(user, month, year)
+                return(":pizza::pizza::pizza:Thank you <@{}>, I will remove you to the pizza numbers for the month {} for the year {}:pizza::pizza::pizza:".format(user, month_str, year))
+            except:
+                return("Sorry, I tried to remove you with that command, but I couldn't quite understand it. Please try again.")
 
     def get_summary(self):
-            print("Received summary request.")
+            result = self.db.get_summary()
+            response = ""
+            for meetup_id, meetup in result.items():
+                total_pizza_count = meetup['other'] + meetup['veg']
+                response += "*Summary*\nMeetup Date: `{}/{}/{}`\nTotal Pizza Count: `{}`\nNon-Vegetarian: `{}`\nVegetarian: `{}`\n\n".format(meetup['day'], meetup['month'], meetup['year'], total_pizza_count, meetup['other'], meetup['veg'])
+            return response
 
     def get_help(self):
             return "You can send me the following commands:\n\
