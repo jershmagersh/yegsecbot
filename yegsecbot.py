@@ -143,7 +143,7 @@ class YegsecBot:
         return (matches.group(1), matches.group(2).strip()) if matches else (None, None)
 
     def get_next_meet(self):
-        return 2,2019
+        return 3,2019
 
     def add_user(self, command, channel, user):
         """
