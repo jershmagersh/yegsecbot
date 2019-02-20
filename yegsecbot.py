@@ -238,9 +238,11 @@ class YegsecBot:
             response = self.get_help()
 
         # Sends the response back to the channel
+        # That only requested user can see
         self.bot.api_call(
-            "chat.postMessage",
+            "chat.postEphemeral",
             channel=channel,
+            user=user,
             text=response or default_response,
             as_user=True,
         )
