@@ -23,11 +23,11 @@ class YegsecDatabase:
         self.cursor = self.conn.cursor()
 
     def confirm_user(self, user, month, year, pref):
-        self.cursor.execute("SELECT * FROM users WHERE user_id = '{}'".format(user))
+        self.cursor.execute("SELECT * FROM users WHERE user_id = ?", (user,))
         result = self.cursor.fetchone()
         if not result:
-            self.cursor.execute("INSERT INTO users (user_id) VALUES ('{}')".format(user))
-        self.cursor.execute("SELECT meetup_id FROM meetups WHERE month_id = {} and year_id = {}".format(month, year))
+            self.cursor.execute("INSERT INTO users (user_id) VALUES (?)", (user,))
+        self.cursor.execute("SELECT meetup_id FROM meetups WHERE month_id = ? and year_id = ?", (month, year))
         meeting_id_a = self.cursor.fetchone()
         if meeting_id_a:
             meeting_id = meeting_id_a[0]
@@ -36,28 +36,28 @@ class YegsecDatabase:
                 veg_bool = 1
             else:
                 veg_bool = 0
-            self.cursor.execute("SELECT * FROM confirmations WHERE meetup_id = {} AND user_id = '{}'".format(meeting_id, user))
+            self.cursor.execute("SELECT * FROM confirmations WHERE meetup_id = ? AND user_id = ?", (meeting_id, user))
             if(self.cursor.fetchone()):
                 return False
             else:
-                self.cursor.execute("INSERT INTO confirmations (user_id, meetup_id, pizza_pref) VALUES ('{}', {}, {})".format(user, meeting_id, veg_bool))
+                self.cursor.execute("INSERT INTO confirmations (user_id, meetup_id, pizza_pref) VALUES (?, ?, ?)", (user, meeting_id, veg_bool))
                 self.yegsec_commit()
                 return True
         else:
             return False
 
     def remove_confirm_user(self, user, month, year):
-        self.cursor.execute("SELECT * FROM users WHERE user_id = '{}'".format(user))
+        self.cursor.execute("SELECT * FROM users WHERE user_id = ?", (user,))
         result = self.cursor.fetchone()
         #A user cannot remove a confirmation if they don't exist in the database already.
         if not result:
             return False
         else:
-            self.cursor.execute("SELECT meetup_id FROM meetups WHERE month_id = {} and year_id = {}".format(month, year))
+            self.cursor.execute("SELECT meetup_id FROM meetups WHERE month_id = ? and year_id = ?", (month, year))
             meeting_id_a = self.cursor.fetchone()
             if meeting_id_a:
                 meeting_id = meeting_id_a[0]
-                self.cursor.execute("DELETE FROM confirmations WHERE user_id = '{}' AND meetup_id = {}".format(user, meeting_id))
+                self.cursor.execute("DELETE FROM confirmations WHERE user_id = ? AND meetup_id = ?", (user, meeting_id))
                 self.yegsec_commit()
             else:
                 return False
@@ -78,11 +78,11 @@ class YegsecDatabase:
 
         for meetup_id_a in meetup_ids:
             meetup_id = meetup_id_a[0]
-            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = {} AND pizza_pref = 1".format(meetup_id))
+            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = ? AND pizza_pref = 1", (meetup_id,))
             veg_count = self.cursor.fetchone()
-            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = {} AND pizza_pref = 0".format(meetup_id))
+            self.cursor.execute("SELECT count(*) FROM confirmations WHERE meetup_id = ? AND pizza_pref = 0", (meetup_id,))
             other_count = self.cursor.fetchone()
-            self.cursor.execute("SELECT day_id, month_id, year_id FROM meetups WHERE meetup_id = {}".format(meetup_id))
+            self.cursor.execute("SELECT day_id, month_id, year_id FROM meetups WHERE meetup_id = ?", (meetup_id,))
             date_result = self.cursor.fetchone()
 
             results[meetup_id] = { "veg": veg_count[0],
@@ -153,30 +153,30 @@ class YegsecBot:
         rs = re.findall("add me for ([0-9]{1,2}), ?([0-9]{4}) (vegetarian|any)", command, re.IGNORECASE)
         rsm = re.findall("add me next (vegetarian|any)", command, re.IGNORECASE)
         if(len(rs) == 1 or len(rsm) == 1):
-            #try:
-            if len(rs) == 1:
-                month = int(rs[0][0])
-                year = int(rs[0][1])
-            elif len(rsm) == 1:
-                month, year = self.get_next_meet()
-                rs = rsm
-            month_str = datetime.datetime(year, month, 1).strftime("%B")
-            vegetarian = None
-            if("VEG" in rs[0][2].upper()):
-                vegetarian = False
-                resp_veg = "vegetarian"
-                vegetarian = True
-            else:
-                vegetarian = True
-                resp_veg = "non-vegetarian"
-                vegetarian = False
-            result = self.db.confirm_user(user, month, year, vegetarian)
-            if result:
-                return(":pizza::pizza::pizza:Thank you <@{}>, I will add you to the pizza numbers for the month {} for the year {} as a {} option:pizza::pizza::pizza:".format(user, month_str, year, resp_veg))
-            else:
-                return(":pizza::pizza::pizza:Sorry, <@{}> it looks like you've already been added for that month.:pizza::pizza::pizza:".format(user))
-            #except:
-            #    return("Sorry, I tried to add you with that command, but I couldn't quite understand it. Please try again.")
+            try:
+                if len(rs) == 1:
+                    month = int(rs[0][0])
+                    year = int(rs[0][1])
+                elif len(rsm) == 1:
+                    month, year = self.get_next_meet()
+                    rs = rsm
+                month_str = datetime.datetime(year, month, 1).strftime("%B")
+                vegetarian = None
+                if("VEG" in rs[0][2].upper()):
+                    vegetarian = False
+                    resp_veg = "vegetarian"
+                    vegetarian = True
+                else:
+                    vegetarian = True
+                    resp_veg = "non-vegetarian"
+                    vegetarian = False
+                result = self.db.confirm_user(user, month, year, vegetarian)
+                if result:
+                    return(":pizza::pizza::pizza:Thank you <@{}>, I will add you to the pizza numbers for the month {} for the year {} as a {} option:pizza::pizza::pizza:".format(user, month_str, year, resp_veg))
+                else:
+                    return(":pizza::pizza::pizza:Sorry, <@{}> it looks like you've already been added for that month.:pizza::pizza::pizza:".format(user))
+            except:
+                return("Sorry, I tried to add you with that command, but I couldn't quite understand it. Please try again.")
 
     def remove_user(self, command, channel, user):
         """
